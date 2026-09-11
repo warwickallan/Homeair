@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+
+# Local data: SQLite database, WhatsApp linked-device session. Never commit.
+data/*
+!data/.gitkeep
+
+*.log
+.DS_Store
+Thumbs.db
