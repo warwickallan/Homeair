@@ -10,7 +10,8 @@
   ],
   "scripts": {
     "setup": "node scripts/setup.mjs",
-    "dev": "concurrently -n server,web -c blue,magenta \"npm run dev -w apps/server\" \"npm run dev -w apps/web\"",
+    "dev": "concurrently -n bridge,server,web -c yellow,blue,magenta \"npm run dev -w apps/llm-bridge\" \"npm run dev -w apps/server\" \"npm run dev -w apps/web\"",
+    "dev:bridge": "npm run dev -w apps/llm-bridge",
     "dev:server": "npm run dev -w apps/server",
     "dev:web": "npm run dev -w apps/web",
     "test": "vitest run",

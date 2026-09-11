@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
 import { AIError, type AIProvider } from "@homeair/ai";
-import { buildContext } from "@homeair/conversation";
+import { buildContext, evaluateTrigger } from "@homeair/conversation";
 import {
   AnalyseRequestSchema,
   AskRequestSchema,
@@ -21,8 +21,9 @@ export type AppOptions = {
 };
 
 /**
- * HTTP surface. Deliberately thin: validate, build context, call the
- * provider, map errors. All reasoning lives in the packages.
+ * HTTP surface. Deliberately thin: validate, run the deterministic trigger,
+ * build context, call the provider, map errors. All reasoning lives in the
+ * packages.
  *
  * Privacy: request bodies are never logged. Fastify's default request log
  * carries method/url/status only, and the error handler logs codes, not
@@ -35,14 +36,26 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   const { provider, recentMessageLimit } = opts;
 
   app.get("/api/health", async (): Promise<HealthResponse> => {
-    return { ok: true, provider: provider.name, model: provider.model };
+    const health = provider.health ? await provider.health() : { ok: true, detail: "" };
+    return { ok: true, provider: provider.name, model: provider.model, ready: health.ok, detail: health.detail };
   });
 
   app.post("/api/analyse", async (request, reply): Promise<AnalyseResponse | ApiError> => {
     const body = validate(AnalyseRequestSchema, request.body);
     if (!body.ok) return reply.code(400).send(body.error);
+
+    // Deterministic gate first: no model call for "👍" or "on my way".
+    const decision = body.data.force
+      ? { analyse: true as const, reasons: ["requested explicitly"] }
+      : evaluateTrigger(body.data.messages, { previousEscalation: body.data.previousEscalation });
+    if (!decision.analyse) {
+      request.log.info({ triggered: false }, "analysis skipped by trigger layer");
+      return { triggered: false, reason: decision.reason };
+    }
+
     const ctx = buildContext(body.data.messages, { recentLimit: recentMessageLimit });
-    return provider.analyseConversation(ctx);
+    const result = await provider.analyseConversation(ctx);
+    return { triggered: true, ...result, trigger: { reasons: decision.reasons } };
   });
 
   app.post("/api/suggest", async (request, reply): Promise<SuggestResponse | ApiError> => {

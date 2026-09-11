@@ -11,6 +11,9 @@ import type {
 /**
  * Provider abstraction (brief §26). The rest of the application talks to
  * this and nothing else; swapping vendors means adding one file here.
+ *
+ * Implementations: BridgeProvider (default — local LLM bridge, no API key),
+ * AnthropicProvider (direct API), MockProvider (tests, keyless demos).
  */
 export interface AIProvider {
   readonly name: string;
@@ -18,7 +21,11 @@ export interface AIProvider {
   analyseConversation(ctx: ConversationContext): Promise<AnalyseOutput>;
   generateResponse(req: ResponseRequest): Promise<Suggestion>;
   answerQuestion(req: QuestionRequest): Promise<Answer>;
+  /** Optional readiness probe for the UI status pill. */
+  health?(): Promise<ProviderHealth>;
 }
+
+export type ProviderHealth = { ok: boolean; detail: string };
 
 export type ResponseRequest = {
   ctx: ConversationContext;

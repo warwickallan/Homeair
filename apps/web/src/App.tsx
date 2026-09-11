@@ -59,6 +59,8 @@ export function App() {
   const [analysis, setAnalysis] = useState<ConversationAnalysis | null>(null);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [answer, setAnswer] = useState<{ question: AnalysisQuestion; text: string } | null>(null);
+  const [skipped, setSkipped] = useState<string | null>(null);
+  const [triggerReasons, setTriggerReasons] = useState<string[]>([]);
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -88,13 +90,22 @@ export function App() {
     }
   }, []);
 
-  const analyse = () =>
+  const analyse = (force = false) =>
     run("analyse", async () => {
       const msgs = parseTranscript(transcript);
       setMessages(msgs);
       setAnswer(null);
       if (msgs.length === 0) throw new Error("Nothing to analyse — paste a conversation using HER: / ME: labels.");
-      const result = await api.analyse({ messages: msgs });
+      const result = await api.analyse({ messages: msgs, force, previousEscalation: analysis?.escalation_level });
+      if (!result.triggered) {
+        setAnalysis(null);
+        setSuggestion(null);
+        setTriggerReasons([]);
+        setSkipped(result.reason);
+        return;
+      }
+      setSkipped(null);
+      setTriggerReasons(result.trigger.reasons);
       setAnalysis(result.analysis);
       setSuggestion(result.suggestion);
     });
@@ -135,8 +146,13 @@ export function App() {
         </div>
         <div className="status">
           {health ? (
-            <span className={`pill ${health.provider === "mock" ? "pill-warn" : "pill-ok"}`} title={health.model}>
-              AI: {health.provider === "mock" ? "mock (no key)" : health.model}
+            <span
+              className={`pill ${health.provider === "mock" ? "pill-warn" : health.ready ? "pill-ok" : "pill-bad"}`}
+              title={health.detail || health.model}
+            >
+              AI: {health.provider === "mock" ? "mock" : health.provider}
+              {health.model !== "bridge default" && health.provider !== "mock" ? ` · ${health.model}` : ""}
+              {health.ready ? "" : " · not ready"}
             </span>
           ) : (
             <span className="pill pill-bad">{healthError ? "server offline" : "connecting…"}</span>
@@ -162,7 +178,7 @@ export function App() {
               spellCheck={false}
             />
             <div className="row">
-              <button className="btn btn-primary" onClick={analyse} disabled={busy !== null || parsed.length === 0}>
+              <button className="btn btn-primary" onClick={() => analyse()} disabled={busy !== null || parsed.length === 0}>
                 {busy === "analyse" ? "Analysing…" : "Analyse"}
               </button>
               <span className="hint">
@@ -197,7 +213,25 @@ export function App() {
             </div>
           )}
 
-          {!analysis && !error && (
+          {health && !health.ready && health.provider !== "mock" && (
+            <div className="alert alert-error" role="alert">
+              AI not ready: {health.detail}
+            </div>
+          )}
+
+          {skipped && !analysis && (
+            <div className="card card-empty">
+              <p>
+                <strong>No model call made.</strong> {skipped}
+              </p>
+              <p className="hint">The deterministic trigger layer decided this wasn't worth asking the AI about.</p>
+              <button className="btn" onClick={() => analyse(true)} disabled={busy !== null}>
+                Analyse anyway
+              </button>
+            </div>
+          )}
+
+          {!analysis && !error && !skipped && (
             <div className="card card-empty">
               <p>Paste a conversation and press <strong>Analyse</strong>.</p>
               <p className="hint">Nothing here is ever sent anywhere. You copy what you want to use.</p>
@@ -251,6 +285,12 @@ export function App() {
                     <code>{analysis.recommended_action.replace(/_/g, " ")}</code>
                     <span className="hint"> · confidence {Math.round(analysis.confidence * 100)}%</span>
                   </dd>
+                  {triggerReasons.length > 0 && (
+                    <>
+                      <dt>Why analysed</dt>
+                      <dd className="hint">{triggerReasons.join(" · ")}</dd>
+                    </>
+                  )}
                 </dl>
               </div>
 

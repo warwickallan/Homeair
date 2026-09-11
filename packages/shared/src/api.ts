@@ -2,9 +2,9 @@ import { z } from "zod";
 import { MessageSchema } from "./message";
 import {
   AnalysisQuestion,
-  AnalyseOutputSchema,
   AnswerSchema,
   ConversationAnalysisSchema,
+  EscalationLevel,
   ResponseMode,
   SuggestionSchema,
 } from "./analysis";
@@ -16,9 +16,29 @@ import {
 
 export const AnalyseRequestSchema = z.object({
   messages: z.array(MessageSchema).min(1),
+  /** Skip the deterministic trigger check (explicit user request). */
+  force: z.boolean().optional(),
+  /** Escalation from the previous analysis, so a tense conversation lowers the trigger bar. */
+  previousEscalation: EscalationLevel.optional(),
 });
 export type AnalyseRequest = z.infer<typeof AnalyseRequestSchema>;
-export const AnalyseResponseSchema = AnalyseOutputSchema;
+
+/**
+ * Either the model was consulted, or the trigger layer decided it wasn't
+ * worth it and says why. The second case costs nothing.
+ */
+export const AnalyseResponseSchema = z.discriminatedUnion("triggered", [
+  z.object({
+    triggered: z.literal(true),
+    analysis: ConversationAnalysisSchema,
+    suggestion: SuggestionSchema,
+    trigger: z.object({ reasons: z.array(z.string()) }),
+  }),
+  z.object({
+    triggered: z.literal(false),
+    reason: z.string(),
+  }),
+]);
 export type AnalyseResponse = z.infer<typeof AnalyseResponseSchema>;
 
 export const SuggestRequestSchema = z.object({
@@ -45,12 +65,15 @@ export const HealthResponseSchema = z.object({
   ok: z.literal(true),
   provider: z.string(),
   model: z.string(),
+  /** Whether the provider believes it can actually serve requests right now. */
+  ready: z.boolean(),
+  detail: z.string(),
 });
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 
 export const ApiErrorSchema = z.object({
   error: z.string(),
-  /** Stable machine-readable code, e.g. "ai_output_invalid", "ai_refused". */
+  /** Stable machine-readable code, e.g. "ai_output_invalid", "ai_auth". */
   code: z.string(),
 });
 export type ApiError = z.infer<typeof ApiErrorSchema>;

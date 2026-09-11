@@ -14,16 +14,20 @@ export type ServerConfig = {
   aiApiKey: string | undefined;
   aiModel: string | undefined;
   aiEffort: string | undefined;
+  bridgeUrl: string | undefined;
+  bridgeToken: string | undefined;
   recentMessageLimit: number;
 };
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   return {
     port: intFrom(env.PORT, 3000),
-    aiProvider: env.AI_PROVIDER ?? "anthropic",
+    aiProvider: env.AI_PROVIDER ?? "bridge",
     aiApiKey: env.AI_API_KEY || env.ANTHROPIC_API_KEY || undefined,
     aiModel: env.AI_MODEL || undefined,
     aiEffort: env.AI_EFFORT || undefined,
+    bridgeUrl: env.BRIDGE_URL || (env.BRIDGE_PORT ? `http://127.0.0.1:${env.BRIDGE_PORT}` : undefined),
+    bridgeToken: env.BRIDGE_TOKEN || undefined,
     recentMessageLimit: intFrom(env.RECENT_MESSAGE_LIMIT, 30),
   };
 }

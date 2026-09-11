@@ -4,24 +4,48 @@ import { parseTranscript } from "@homeair/conversation";
 import { buildApp } from "./app";
 
 const messages = parseTranscript("HER: You never listen.\nME: That's not fair.\nHER: THIS IS EXACTLY WHAT I MEAN.");
+const routine = parseTranscript("HER: You never listen.\nME: That's not fair.\nHER: ok");
 
 describe("API with mock provider", () => {
   const app = buildApp({ provider: new MockProvider(0), recentMessageLimit: 30, logger: false });
   beforeAll(() => app.ready());
   afterAll(() => app.close());
 
-  it("reports health with the provider name", async () => {
+  it("reports health with the provider name and readiness", async () => {
     const res = await app.inject({ method: "GET", url: "/api/health" });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ ok: true, provider: "mock" });
+    expect(res.json()).toMatchObject({ ok: true, provider: "mock", ready: true });
   });
 
-  it("analyses a conversation and returns analysis + suggestion", async () => {
+  it("analyses a conversation and returns analysis + suggestion + trigger reasons", async () => {
     const res = await app.inject({ method: "POST", url: "/api/analyse", payload: { messages } });
     expect(res.statusCode).toBe(200);
     const body = res.json();
+    expect(body.triggered).toBe(true);
     expect(body.analysis.escalation_level).toBeDefined();
     expect(typeof body.suggestion.text).toBe("string");
+    expect(body.trigger.reasons.length).toBeGreaterThan(0);
+  });
+
+  it("skips the model when the latest message is routine, and explains why", async () => {
+    const res = await app.inject({ method: "POST", url: "/api/analyse", payload: { messages: routine } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ triggered: false, reason: expect.stringMatching(/routine/) });
+  });
+
+  it("analyses a routine message anyway when forced", async () => {
+    const res = await app.inject({ method: "POST", url: "/api/analyse", payload: { messages: routine, force: true } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ triggered: true, trigger: { reasons: ["requested explicitly"] } });
+  });
+
+  it("analyses a routine message when the conversation was already tense", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/analyse",
+      payload: { messages: routine, previousEscalation: "high_conflict" },
+    });
+    expect(res.json().triggered).toBe(true);
   });
 
   it("rejects an empty message list with 400", async () => {
@@ -75,10 +99,17 @@ describe("API when the provider fails", () => {
     answerQuestion: async () => {
       throw new Error("something unexpected");
     },
+    health: async () => ({ ok: false, detail: "bridge down" }),
   };
   const app = buildApp({ provider: failing, recentMessageLimit: 30, logger: false });
   beforeAll(() => app.ready());
   afterAll(() => app.close());
+
+  it("reports not-ready health without failing the request", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/health" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ready: false, detail: "bridge down" });
+  });
 
   it("maps malformed AI output to a 502 with a stable code, and the server keeps running", async () => {
     const res = await app.inject({ method: "POST", url: "/api/analyse", payload: { messages } });
