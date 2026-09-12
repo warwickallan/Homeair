@@ -1,0 +1,21 @@
+{
+  "name": "@homeair/messaging",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@homeair/shared": "*",
+    "@whiskeysockets/baileys": "7.0.0-rc14",
+    "pino": "^10.3.1",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/qrcode": "^1.5.5"
+  }
+}

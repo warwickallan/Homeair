@@ -14,8 +14,14 @@ import {
  * mismatch is a type error, not a runtime surprise.
  */
 
+/** Either inline messages (simulator) or the id of the enabled live chat. */
+const SourceFields = {
+  messages: z.array(MessageSchema).min(1).optional(),
+  chatId: z.string().optional(),
+};
+
 export const AnalyseRequestSchema = z.object({
-  messages: z.array(MessageSchema).min(1),
+  ...SourceFields,
   /** Skip the deterministic trigger check (explicit user request). */
   force: z.boolean().optional(),
   /** Escalation from the previous analysis, so a tense conversation lowers the trigger bar. */
@@ -42,7 +48,7 @@ export const AnalyseResponseSchema = z.discriminatedUnion("triggered", [
 export type AnalyseResponse = z.infer<typeof AnalyseResponseSchema>;
 
 export const SuggestRequestSchema = z.object({
-  messages: z.array(MessageSchema).min(1),
+  ...SourceFields,
   analysis: ConversationAnalysisSchema,
   mode: ResponseMode,
   /** The suggestion being reshaped, so "shorter" means shorter than *this*. */
@@ -53,7 +59,7 @@ export const SuggestResponseSchema = z.object({ suggestion: SuggestionSchema });
 export type SuggestResponse = z.infer<typeof SuggestResponseSchema>;
 
 export const AskRequestSchema = z.object({
-  messages: z.array(MessageSchema).min(1),
+  ...SourceFields,
   analysis: ConversationAnalysisSchema,
   question: AnalysisQuestion,
 });

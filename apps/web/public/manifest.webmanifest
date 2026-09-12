@@ -1,0 +1,15 @@
+{
+  "name": "HomeAIR — Relationship Copilot",
+  "short_name": "HomeAIR",
+  "description": "Private WhatsApp communication copilot. Nothing is sent without you.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f5f7",
+  "theme_color": "#1c1e21",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

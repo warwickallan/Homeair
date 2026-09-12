@@ -16,7 +16,9 @@
     "dev:web": "npm run dev -w apps/web",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build -w apps/web",
+    "start": "concurrently -n bridge,server -c yellow,blue \"npm run start -w apps/llm-bridge\" \"npm run start -w apps/server\""
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
